@@ -7,6 +7,7 @@ import exception.ProdusAlreadyExistsException;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
+import java.util.List;
 import java.util.Optional;
 
 public class HibernateInventoryService implements InventoryService{
@@ -16,17 +17,55 @@ public class HibernateInventoryService implements InventoryService{
 
     @Override
     public void add(Produs produs) throws ProdusAlreadyExistsException {
+        Session session = this.sessionFactory.openSession();
+        try {
+            session.getTransaction().begin();
 
+            // Check if the product already exists
+            Produs existingProdus = session.get(Produs.class, produs.getIsbn());
+            if (existingProdus != null) {
+                throw new ProdusAlreadyExistsException("Product already exists in inventory");
+            }
+
+            // Add the new product to the inventory
+            session.persist(produs);
+
+            session.getTransaction().commit();
+        } catch (Exception e) {
+            session.getTransaction().rollback();
+            throw e;
+        } finally {
+            session.close();
+        }
     }
 
     @Override
     public void delete(Produs produs) throws InexistentItemException {
+        Session session = this.sessionFactory.openSession();
+        try {
+            session.getTransaction().begin();
 
+            // Check if the product exists
+            Produs existingProdus = session.get(Produs.class, produs.getIsbn());
+            if (existingProdus == null) {
+                throw new InexistentItemException("Product does not exist in inventory");
+            }
+
+            // Delete the product from the inventory
+            session.delete(existingProdus);
+
+            session.getTransaction().commit();
+        } catch (Exception e) {
+            session.getTransaction().rollback();
+            throw e;
+        } finally {
+            session.close();
+        }
     }
 
     @Override
     public void update(Produs produs) {
-
+        //de rezolvat update
     }
 
     @Override
@@ -47,6 +86,24 @@ public class HibernateInventoryService implements InventoryService{
 
     @Override
     public void displayAll() {
+        Session session = this.sessionFactory.openSession();
+        try {
+            session.getTransaction().begin();
 
+            // Retrieve all products from the inventory
+            List<Produs> produse = session.createQuery("FROM Produs").getResultList();
+
+            // Print the details of each product
+            for (Produs produs : produse) {
+                System.out.println(produs.toString());
+            }
+
+            session.getTransaction().commit();
+        } catch (Exception e) {
+            session.getTransaction().rollback();
+            throw e;
+        } finally {
+            session.close();
+        }
     }
 }
