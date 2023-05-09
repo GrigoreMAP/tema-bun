@@ -3,6 +3,8 @@ package entities;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDateTime;
+
 @NoArgsConstructor
 //TODO - please read
 //there is a bidirectional relationship between ShoppingCartItem and ShoppingCart
@@ -23,6 +25,8 @@ public class ShoppingCartItem {
     private ShoppingCartItemPK id;
 
     private int quantity;
+
+    private LocalDateTime endOfOpenness;
 
     @ToString.Exclude
     @ManyToOne

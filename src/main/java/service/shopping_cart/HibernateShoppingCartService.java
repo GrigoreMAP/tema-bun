@@ -82,6 +82,22 @@ public class HibernateShoppingCartService implements ShoppingCartService {
             newShoppingCartItem.setShoppingCart(customerShoppingCart);
             newShoppingCartItem.setId(new ShoppingCartItemPK(produs.getIsbn(), customerShoppingCart.getId()));
 
+            // leave product open for a total of 12 or multiple of 12 hours
+            LocalDateTime now = LocalDateTime.now();
+            int hour = now.getHour();
+            int remaining = hour % 12;
+            int remainingMinutes = 60 - now.getMinute();
+            int remainingSeconds = 60 - now.getSecond();
+            int remainingMillis = 1000 - now.getNano() / 1000000;
+            LocalDateTime endOfOpenness = now.plusHours(remaining == 0 ? 12 : (12 - remaining))
+                    .minusMinutes(now.getMinute())
+                    .minusSeconds(now.getSecond())
+                    .minusNanos(now.getNano())
+                    .plusMinutes(remainingMinutes)
+                    .plusSeconds(remainingSeconds).plusSeconds(remainingMillis);
+
+            newShoppingCartItem.setEndOfOpenness(endOfOpenness);
+
             session.merge(newShoppingCartItem);
 
             customerShoppingCart.getItems().add(newShoppingCartItem);
