@@ -4,6 +4,10 @@ import database.DbConnection;
 import entities.Produs;
 import exception.InexistentItemException;
 import exception.ProdusAlreadyExistsException;
+import jakarta.persistence.TypedQuery;
+import jakarta.persistence.criteria.CriteriaBuilder;
+import jakarta.persistence.criteria.CriteriaQuery;
+import jakarta.persistence.criteria.Root;
 import org.hibernate.Session;
 import org.hibernate.SessionFactory;
 
@@ -70,7 +74,18 @@ public class HibernateInventoryService implements InventoryService{
 
     @Override
     public Optional<Produs> searchByTitle(String title) throws InexistentItemException {
-        return Optional.empty();
+        Session session = this.sessionFactory.openSession();
+        CriteriaBuilder builder = session.getCriteriaBuilder();
+        CriteriaQuery<Produs> query = builder.createQuery(Produs.class);
+        Root<Produs> root = query.from(Produs.class);
+        query.select(root).where(builder.equal(root.get("title"), title));
+        TypedQuery<Produs> typedQuery = session.createQuery(query);
+        Produs produs = typedQuery.getSingleResult();
+        session.close();
+        if (produs == null) {
+            throw new InexistentItemException("Product with title " + title + " does not exist");
+        }
+        return Optional.of(produs);
     }
 
     @Override

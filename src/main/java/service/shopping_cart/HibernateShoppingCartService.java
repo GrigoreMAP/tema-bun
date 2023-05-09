@@ -13,6 +13,8 @@ import org.hibernate.Transaction;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class HibernateShoppingCartService implements ShoppingCartService {
     private SessionFactory sessionFactory;
@@ -93,12 +95,68 @@ public class HibernateShoppingCartService implements ShoppingCartService {
 
     @Override
     public void removeFromCart(Customer customer, Produs produs) throws InexistentItemException {
+        Session session = this.sessionFactory.openSession();
 
+        Transaction transaction = session.beginTransaction();
+
+        ShoppingCartItem itemToRemove = null;
+        for (ShoppingCart cart : customer.getShoppingCarts()) {
+            for (ShoppingCartItem item : cart.getItems()) {
+                if (item.getProdus().getIsbn().equals(produs.getIsbn())) {
+                    itemToRemove = item;
+                    break;
+                }
+            }
+            if (itemToRemove != null) {
+                break;
+            }
+        }
+
+        if (itemToRemove == null) {
+            throw new InexistentItemException("Product is not in the shopping cart.");
+        }
+
+        ShoppingCart cart = itemToRemove.getShoppingCart();
+        cart.getItems().remove(itemToRemove);
+
+        session.delete(itemToRemove);
+
+        transaction.commit();
+        session.close();
     }
 
     @Override
     public void updateQuantity(Customer customer, Produs produs, int quantity) throws InvalidQuantityException, InexistentItemException {
+        if (quantity < 0) {
+            throw new InvalidQuantityException("Quantity cannot be negative.");
+        }
 
+        Session session = this.sessionFactory.openSession();
+        Transaction transaction = session.beginTransaction();
+
+        Optional<ShoppingCartItem> shoppingCartItemOptional = getShoppingCartItem(session, customer.getId(), produs.getIsbn());
+
+        if (!shoppingCartItemOptional.isPresent()) {
+            throw new InexistentItemException("Item does not exist in the shopping cart.");
+        }
+
+        ShoppingCartItem shoppingCartItem = shoppingCartItemOptional.get();
+        shoppingCartItem.setQuantity(quantity);
+        session.merge(shoppingCartItem);
+
+        transaction.commit();
+        session.close();
+    }
+    private Optional<ShoppingCartItem> getShoppingCartItem(Session session, Integer customerId, String isbn) {
+        Query query = session.createQuery("FROM ShoppingCartItem WHERE shoppingCart.customer.id = :customerId AND produs.isbn = :isbn", ShoppingCartItem.class);
+        query.setParameter("customerId", customerId);
+        query.setParameter("isbn", isbn);
+        List<ShoppingCartItem> resultList = query.getResultList();
+        if (resultList.isEmpty()) {
+            return Optional.empty();
+        } else {
+            return Optional.of(resultList.get(0));
+        }
     }
 
     @Override
@@ -119,7 +177,21 @@ public class HibernateShoppingCartService implements ShoppingCartService {
 
     @Override
     public Map<String, Integer> getShoppingCartItems(String clientId) {
-        return null;
+
+        Session session = this.sessionFactory.openSession();
+
+        Query query = session.createNamedQuery("getShoppingCartItems", Object[].class);
+        query.setParameter("id", clientId);
+
+        List<Object[]> results = query.getResultList();
+        Map<String, Integer> items = results.stream()
+                .collect(Collectors.toMap(
+                        row -> (String)row[0], //title
+                        row -> (Integer)row[1] //quantity
+                ));
+
+        session.close();
+        return items;
     }
 
     @Override
@@ -129,6 +201,13 @@ public class HibernateShoppingCartService implements ShoppingCartService {
 
     @Override
     public void displayAll(Customer customer) {
-
+        for (ShoppingCart cart : customer.getShoppingCarts()) {
+            System.out.println("Shopping Cart " + cart.getId());
+            System.out.println("Last Edited: " + cart.getLastEdited());
+            System.out.println("Status: " + cart.getStatus());
+            for (ShoppingCartItem item : cart.getItems()) {
+                System.out.println("  " + item.getProdus().getTitle() + " x " + item.getQuantity());
+            }
+        }
     }
 }
